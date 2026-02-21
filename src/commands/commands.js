@@ -2,12 +2,20 @@ const { spawnSync } = require('child_process');
 const readline = require('readline');
 
 function git(...args) {
-  const result = spawnSync('git', args.flat(), { stdio: 'inherit' });
+  const result = spawnSync('git', args.flat(), { stdio: ['inherit', 'pipe', 'pipe'] });
+  const stdout = result.stdout ? result.stdout.toString() : '';
+  const stderr = result.stderr ? result.stderr.toString() : '';
+
+  if (stdout) process.stdout.write(stdout);
+  if (stderr) process.stderr.write(stderr);
+
   if (result.status !== 0) {
     const err = new Error();
-    err.stderr = result.stderr ? result.stderr.toString() : '';
+    err.stderr = stderr + stdout;
     throw err;
   }
+
+  return stdout;
 }
 
 function gitOut(...args) {
@@ -38,16 +46,16 @@ function remoteAda(nama) {
 
 const run = {
 
+  // git init
   async mulai() {
     console.log('\n🚀 Memulai git di folder ini...\n');
     git('init');
-
     try { git('checkout', '-b', 'main'); } catch (_) {}
-
     console.log('\n✅ Berhasil! Folder ini sekarang pakai git.');
     console.log('   Selanjutnya: gitku tandai semua → gitku simpan "pertama"\n');
   },
 
+  // git clone
   async ambil([url, ...rest]) {
     if (!url) {
       console.error('\n❌ Kasih URL repo-nya ya.');
@@ -59,11 +67,13 @@ const run = {
     console.log('\n✅ Berhasil diunduh!\n');
   },
 
+  // git status
   async cek() {
     console.log('\n🔍 Status perubahan:\n');
     git('status');
   },
 
+  // git add
   async tandai([target, ...rest]) {
     if (!target || target === 'semua') {
       console.log('\n📌 Menandai semua file...\n');
@@ -77,17 +87,23 @@ const run = {
     }
   },
 
+  // git commit
   async simpan([pesan]) {
     if (!pesan) {
       pesan = await tanya('💬 Pesan simpanan kamu: ');
       if (!pesan) { console.error('❌ Pesan tidak boleh kosong.\n'); return; }
     }
     console.log('\n💾 Menyimpan perubahan...\n');
-    git('commit', '-m', pesan);
+    const out = git('commit', '-m', pesan);
+    if (/nothing to commit|nothing added/i.test(out)) {
+      console.log('\n⚠️  Tidak ada yang perlu disimpan. Semua sudah up to date!\n');
+      return;
+    }
     console.log('\n✅ Tersimpan!');
     console.log('   Mau kirim ke GitHub? Ketik: gitku kirim\n');
   },
 
+  // git push
   async kirim(args) {
     console.log('\n📤 Mengirim ke remote...\n');
 
@@ -122,6 +138,7 @@ const run = {
     console.log(`\n✅ Terkirim ke ${remote}/${branch}!\n`);
   },
 
+  // git pull
   async tarik(args) {
     console.log('\n📥 Mengambil update terbaru...\n');
     const extra = args.includes('--izinkan-beda') ? ['--allow-unrelated-histories'] : [];
@@ -129,6 +146,7 @@ const run = {
     console.log('\n✅ Berhasil diperbarui!\n');
   },
 
+  // git branch
   async cabang([sub, nama]) {
     if (sub === 'baru') {
       if (!nama) { console.error('\n❌ Kasih nama cabangnya.\n   Contoh: gitku cabang baru fitur-login\n'); return; }
@@ -148,6 +166,7 @@ const run = {
     }
   },
 
+  // git checkout
   async pindah([nama]) {
     if (!nama) { console.error('\n❌ Kasih nama cabang tujuannya.\n   Contoh: gitku pindah main\n'); return; }
     console.log(`\n🔀 Pindah ke "${nama}"...\n`);
@@ -155,6 +174,7 @@ const run = {
     console.log(`\n✅ Sekarang di cabang "${nama}"!\n`);
   },
 
+  // git merge
   async gabung([nama]) {
     if (!nama) { console.error('\n❌ Kasih nama cabang yang mau digabung.\n   Contoh: gitku gabung fitur-login\n'); return; }
     console.log(`\n🔀 Menggabung cabang "${nama}"...\n`);
@@ -162,12 +182,14 @@ const run = {
     console.log(`\n✅ Cabang "${nama}" berhasil digabung!\n`);
   },
 
+  // git log
   async riwayat() {
     console.log('\n📜 Riwayat commit:\n');
     git('log', '--oneline', '--graph', '--decorate', '-20');
     console.log('');
   },
 
+  // git restore .
   async reset() {
     const yakin = await tanyaYN('⚠️  Ini akan MENGHAPUS semua perubahan yang belum disimpan. Yakin?');
     if (!yakin) { console.log('Dibatalkan.\n'); return; }
@@ -175,6 +197,7 @@ const run = {
     console.log('\n✅ Perubahan dibuang. Folder kembali ke commit terakhir.\n');
   },
 
+  // git remote
   async remote([sub, url]) {
     if (sub === 'ganti') {
       if (!url) { console.error('\n❌ Kasih URL barunya.\n   Contoh: gitku remote ganti https://github.com/user/repo\n'); return; }
@@ -193,6 +216,7 @@ const run = {
     console.log('✅ Disembunyikan! Kembalikan dengan: gitku ambil-sementara\n');
   },
 
+  // git stash pop
   async 'ambil-sementara'() {
     console.log('\n🗂  Mengembalikan perubahan...\n');
     git('stash', 'pop');
