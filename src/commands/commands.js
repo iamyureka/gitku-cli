@@ -1,6 +1,7 @@
 const { spawnSync } = require('child_process');
 const readline = require('readline');
 
+// Jalankan git, output langsung ke terminal
 function git(...args) {
   const result = spawnSync('git', args.flat(), { stdio: 'inherit' });
   if (result.status !== 0) {
@@ -10,12 +11,14 @@ function git(...args) {
   }
 }
 
+// Jalankan git, ambil output sebagai string
 function gitOut(...args) {
   const result = spawnSync('git', args.flat());
   if (result.status !== 0) throw new Error(result.stderr.toString());
   return result.stdout.toString().trim();
 }
 
+// Tanya user input
 function tanya(pertanyaan) {
   return new Promise(resolve => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -74,10 +77,23 @@ const run = {
 
   async kirim(args) {
     console.log('\n📤 Mengirim ke remote...\n');
+
     let branch = 'main';
     try { branch = gitOut('branch', '--show-current'); } catch (_) {}
+
     const remote = args.includes('--remote') ? args[args.indexOf('--remote') + 1] : 'origin';
-    git('push', remote, branch);
+
+    // Cek apakah remote sudah ada
+    const remoteList = spawnSync('git', ['remote']).stdout.toString().trim();
+    if (!remoteList.includes(remote)) {
+      console.log(`⚠️  Remote "${remote}" belum diatur.`);
+      const url = await tanya('🔗 Masukkan URL repo GitHub kamu: ');
+      if (!url) { console.error('❌ URL tidak boleh kosong.\n'); return; }
+      git('remote', 'add', remote, url);
+      console.log(`✅ Remote ditambahkan!\n`);
+    }
+
+    git('push', '-u', remote, branch);
     console.log(`\n✅ Terkirim ke ${remote}/${branch}!\n`);
   },
 
