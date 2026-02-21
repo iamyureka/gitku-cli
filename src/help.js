@@ -30,6 +30,6 @@ LAINNYA:
   gitku reset                    buang semua perubahan (git restore .)
   gitku simpan-sementara         git stash
   gitku ambil-sementara          git stash pop
-  gitku tolong                   tampilkan bantuan ini
+  gitku help                     tampilkan bantuan ini
 `);
 };
