@@ -1,7 +1,6 @@
 const { spawnSync } = require('child_process');
 const readline = require('readline');
 
-// Jalankan git, output langsung ke terminal
 function git(...args) {
   const result = spawnSync('git', args.flat(), { stdio: 'inherit' });
   if (result.status !== 0) {
@@ -11,14 +10,12 @@ function git(...args) {
   }
 }
 
-// Jalankan git, ambil output sebagai string
 function gitOut(...args) {
   const result = spawnSync('git', args.flat());
   if (result.status !== 0) throw new Error(result.stderr.toString());
   return result.stdout.toString().trim();
 }
 
-// Tanya user input
 function tanya(pertanyaan) {
   return new Promise(resolve => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -26,11 +23,27 @@ function tanya(pertanyaan) {
   });
 }
 
+async function tanyaYN(pertanyaan) {
+  const jawab = await tanya(`${pertanyaan} (y/n): `);
+  return jawab.toLowerCase() === 'y';
+}
+
+function branchAktif() {
+  try { return gitOut('branch', '--show-current') || 'main'; } catch (_) { return 'main'; }
+}
+
+function remoteAda(nama) {
+  return spawnSync('git', ['remote']).stdout.toString().trim().split('\n').includes(nama);
+}
+
 const run = {
 
   async mulai() {
     console.log('\n🚀 Memulai git di folder ini...\n');
     git('init');
+
+    try { git('checkout', '-b', 'main'); } catch (_) {}
+
     console.log('\n✅ Berhasil! Folder ini sekarang pakai git.');
     console.log('   Selanjutnya: gitku tandai semua → gitku simpan "pertama"\n');
   },
@@ -78,22 +91,34 @@ const run = {
   async kirim(args) {
     console.log('\n📤 Mengirim ke remote...\n');
 
-    let branch = 'main';
-    try { branch = gitOut('branch', '--show-current'); } catch (_) {}
-
+    const paksa = args.includes('--paksa');
     const remote = args.includes('--remote') ? args[args.indexOf('--remote') + 1] : 'origin';
+    let branch = branchAktif();
 
-    // Cek apakah remote sudah ada
-    const remoteList = spawnSync('git', ['remote']).stdout.toString().trim();
-    if (!remoteList.includes(remote)) {
+    if (branch === 'master') {
+      const mauMain = await tanyaYN('⚠️  Branch kamu "master". Mau diganti ke "main"?');
+      if (mauMain) {
+        git('branch', '-m', 'master', 'main');
+        branch = 'main';
+        console.log('✅ Branch diganti ke "main"\n');
+      }
+    }
+
+    if (!remoteAda(remote)) {
       console.log(`⚠️  Remote "${remote}" belum diatur.`);
       const url = await tanya('🔗 Masukkan URL repo GitHub kamu: ');
       if (!url) { console.error('❌ URL tidak boleh kosong.\n'); return; }
       git('remote', 'add', remote, url);
-      console.log(`✅ Remote ditambahkan!\n`);
+      console.log('✅ Remote ditambahkan!\n');
     }
 
-    git('push', '-u', remote, branch);
+    const pushArgs = ['push', '-u', remote, branch];
+    if (paksa) {
+      console.log('⚠️  Mode paksa aktif — override remote...\n');
+      pushArgs.push('--force');
+    }
+
+    git(...pushArgs);
     console.log(`\n✅ Terkirim ke ${remote}/${branch}!\n`);
   },
 
@@ -110,6 +135,12 @@ const run = {
       console.log(`\n🌿 Membuat cabang "${nama}"...\n`);
       git('checkout', '-b', nama);
       console.log(`\n✅ Cabang "${nama}" dibuat!\n`);
+    } else if (sub === 'hapus') {
+      if (!nama) { console.error('\n❌ Kasih nama cabang yang mau dihapus.\n   Contoh: gitku cabang hapus fitur-login\n'); return; }
+      const yakin = await tanyaYN(`⚠️  Yakin mau hapus cabang "${nama}"?`);
+      if (!yakin) { console.log('Dibatalkan.\n'); return; }
+      git('branch', '-d', nama);
+      console.log(`\n✅ Cabang "${nama}" dihapus!\n`);
     } else {
       console.log('\n🌿 Daftar cabang:\n');
       git('branch');
@@ -135,6 +166,25 @@ const run = {
     console.log('\n📜 Riwayat commit:\n');
     git('log', '--oneline', '--graph', '--decorate', '-20');
     console.log('');
+  },
+
+  async reset() {
+    const yakin = await tanyaYN('⚠️  Ini akan MENGHAPUS semua perubahan yang belum disimpan. Yakin?');
+    if (!yakin) { console.log('Dibatalkan.\n'); return; }
+    git('restore', '.');
+    console.log('\n✅ Perubahan dibuang. Folder kembali ke commit terakhir.\n');
+  },
+
+  async remote([sub, url]) {
+    if (sub === 'ganti') {
+      if (!url) { console.error('\n❌ Kasih URL barunya.\n   Contoh: gitku remote ganti https://github.com/user/repo\n'); return; }
+      git('remote', 'set-url', 'origin', url);
+      console.log(`\n✅ Remote origin diganti ke:\n   ${url}\n`);
+    } else {
+      console.log('\n🔗 Remote yang terdaftar:\n');
+      git('remote', '-v');
+      console.log('');
+    }
   },
 
   async 'simpan-sementara'() {
