@@ -63,7 +63,7 @@ npm link
 | `gitku riwayat` | `git log --oneline --graph` | Lihat riwayat commit |
 | `gitku simpan-sementara` | `git stash` | Sembunyikan perubahan sementara |
 | `gitku ambil-sementara` | `git stash pop` | Kembalikan yang disembunyikan |
-| `gitku tolong` | — | Tampilkan bantuan |
+| `gitku help` | — | Tampilkan bantuan |
 
 ---
 
@@ -112,5 +112,6 @@ gitku kirim
 ---
 
 ## Lisensi
+
 
 MIT
