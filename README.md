@@ -23,7 +23,7 @@ npm install -g gitku
 Atau clone manual:
 
 ```bash
-git clone https://github.com/USERNAME/gitku.git
+git clone https://github.com/Osanavv/gitku-cli.git
 cd gitku
 npm link
 ```
@@ -115,4 +115,5 @@ gitku kirim
 
 
 MIT
+
 
